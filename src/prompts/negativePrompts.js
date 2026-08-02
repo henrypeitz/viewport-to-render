@@ -1,0 +1,1 @@
+export const NEGATIVE_PROMPT = `Avoid warped geometry, changed camera angle, duplicated objects, floating elements, melted surfaces, distorted furniture, broken perspective, excessive HDR, plastic materials, fake reflections, illegible artifacts, text, logos and watermarks.`

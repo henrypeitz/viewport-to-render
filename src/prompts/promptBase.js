@@ -1,0 +1,1 @@
+export const PROMPT_BASE = `Transform the supplied architectural reference into a polished, photorealistic architectural visualization. Treat the reference image as the source of truth for camera position, spatial relationships and design intent. Produce physically plausible lighting, coherent materials, clean edges and professional client-ready image quality.`
