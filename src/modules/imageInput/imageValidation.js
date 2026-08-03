@@ -1,4 +1,3 @@
-const ACCEPTED_TYPES = ['image/png', 'image/jpeg', 'image/webp']
 export const MAX_IMAGE_BYTES = 20 * 1024 * 1024
 
 function readAsDataUrl(file) {
@@ -21,8 +20,8 @@ function readDimensions(dataUrl) {
 
 export async function createImageAsset(file, source = 'upload') {
   if (!file) throw new Error('Selecione uma imagem para continuar.')
-  if (!ACCEPTED_TYPES.includes(file.type)) {
-    throw new Error('Use uma imagem PNG, JPEG ou WebP.')
+  if (!file.type?.startsWith('image/')) {
+    throw new Error('Use um arquivo de imagem.')
   }
   if (file.size > MAX_IMAGE_BYTES) {
     throw new Error('A imagem deve ter no máximo 20 MB.')

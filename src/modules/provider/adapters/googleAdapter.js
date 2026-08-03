@@ -1,8 +1,11 @@
 import {
-  dataUrlParts,
+  normalizeImageDataUrl,
   readProviderError,
   toImageDataUrl,
 } from './providerUtils'
+
+const API_URL = '/api/google/interactions'
+const GOOGLE_INPUT_MIME_TYPES = ['image/jpeg', 'image/png']
 
 function normalizeModelId(modelId) {
   return modelId.replace(/^google\//, '')
@@ -15,13 +18,8 @@ function normalizeQuality(modelId, requestedQuality) {
   return requestedQuality
 }
 
-function shouldSendImageSize(modelId) {
-  return !modelId.includes('2.5-flash-image')
-}
-
 function findImageBlock(value) {
   if (!value || typeof value !== 'object') return null
-  if (value.inlineData || value.inline_data) return value.inlineData || value.inline_data
   if (value.type === 'image' && (value.data || value.uri)) return value
 
   for (const child of Object.values(value)) {
@@ -35,6 +33,15 @@ function findImageBlock(value) {
   return null
 }
 
+async function createImageInput(dataUrl) {
+  const image = await normalizeImageDataUrl(dataUrl, {
+    outputMimeType: 'image/jpeg',
+    passthroughMimeTypes: GOOGLE_INPUT_MIME_TYPES,
+  })
+
+  return { type: 'image', mime_type: image.mimeType, data: image.base64 }
+}
+
 export const googleAdapter = {
   id: 'google',
   supportsMaskEdit: 'reference',
@@ -42,35 +49,34 @@ export const googleAdapter = {
 
   async generateImage(request) {
     const model = normalizeModelId(request.modelId)
-    const source = dataUrlParts(request.image.dataUrl)
-    const parts = [
-      { text: request.prompt },
-      { inline_data: { mime_type: source.mimeType, data: source.base64 } },
+    const input = [
+      { type: 'text', text: request.prompt },
+      await createImageInput(request.image.dataUrl),
     ]
 
     if (request.maskUrl) {
-      const mask = dataUrlParts(request.maskUrl)
-      parts.push({ inline_data: { mime_type: mask.mimeType, data: mask.base64 } })
+      input.push(await createImageInput(request.maskUrl))
     }
 
-    const imageConfig = {}
-    if (request.aspect !== 'original') imageConfig.aspectRatio = request.aspect
-    if (shouldSendImageSize(model)) imageConfig.imageSize = normalizeQuality(model, request.quality)
+    const responseFormat = {
+      type: 'image',
+      mime_type: 'image/jpeg',
+      image_size: normalizeQuality(model, request.quality),
+    }
 
-    const response = await fetch(`/api/google/models/${model}:generateContent`, {
+    if (request.aspect !== 'original') responseFormat.aspect_ratio = request.aspect
+
+    const response = await fetch(API_URL, {
       method: 'POST',
       headers: {
         'x-goog-api-key': request.apiKey,
         'Content-Type': 'application/json',
+        'Api-Revision': '2026-05-20',
       },
       body: JSON.stringify({
-        contents: [{ parts }],
-        generationConfig: {
-          responseModalities: ['IMAGE'],
-          ...(Object.keys(imageConfig).length
-            ? { responseFormat: { image: imageConfig } }
-            : {}),
-        },
+        model,
+        input,
+        response_format: responseFormat,
       }),
       signal: request.signal,
     })
@@ -78,16 +84,12 @@ export const googleAdapter = {
     if (!response.ok) throw await readProviderError(response, 'Google AI Studio')
 
     const result = await response.json()
-    if (result.promptFeedback?.blockReason) {
-      throw new Error(`O Google AI Studio bloqueou a geração: ${result.promptFeedback.blockReason}.`)
-    }
-
     if (result.status === 'failed') {
       throw new Error('O Google AI Studio não conseguiu concluir esta geração.')
     }
 
-    const image = findImageBlock(result.candidates) || result.output_image
-    const imageUrl = image?.uri || toImageDataUrl(image?.data, image?.mimeType || image?.mime_type)
+    const image = result.output_image || findImageBlock(result.steps || result.outputs)
+    const imageUrl = image?.uri || toImageDataUrl(image?.data, image?.mime_type || 'image/jpeg')
 
     return {
       imageUrl,

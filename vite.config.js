@@ -7,7 +7,7 @@ function googleApiProxy() {
     target: 'https://generativelanguage.googleapis.com',
     changeOrigin: true,
     secure: true,
-    rewrite: (path) => path.replace(/^\/api\/google/, '/v1'),
+    rewrite: (path) => path.replace(/^\/api\/google/, '/v1beta'),
   }
 }
 

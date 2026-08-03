@@ -94,12 +94,32 @@ function createInitialProviderState() {
   }
 }
 
+const IMAGE_EXTENSIONS = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+}
+
+function imageMimeTypeFromDataUrl(dataUrl) {
+  return /^data:([^;]+)/.exec(dataUrl || '')?.[1] || 'image/png'
+}
+
+function imageExtensionFromDataUrl(dataUrl) {
+  return IMAGE_EXTENSIONS[imageMimeTypeFromDataUrl(dataUrl)] || 'png'
+}
+
+function renderFileName(dataUrl, prefix = 'render') {
+  return `${prefix}-${Date.now()}.${imageExtensionFromDataUrl(dataUrl)}`
+}
+
 function resultToImageAsset(result) {
+  const mimeType = imageMimeTypeFromDataUrl(result.imageUrl)
+
   return {
     id: crypto.randomUUID(),
     source: 'previousRender',
-    fileName: `render-${Date.now()}.png`,
-    mimeType: 'image/png',
+    fileName: renderFileName(result.imageUrl),
+    mimeType,
     size: null,
     width: null,
     height: null,
@@ -655,7 +675,7 @@ function App() {
                   beforeUrl={generation.currentResult?.sourceImageUrl || image?.dataUrl}
                   result={generation.currentResult}
                   status={generation.status}
-                  onDownload={() => downloadDataUrl(generation.currentResult.imageUrl, `render-${Date.now()}.png`)}
+                  onDownload={() => downloadDataUrl(generation.currentResult.imageUrl, renderFileName(generation.currentResult.imageUrl))}
                   onRestart={restartScene}
                   onVariation={handleVariation}
                   onUseResultAsBase={() => setResultAsBase()}
